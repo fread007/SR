@@ -14,7 +14,7 @@ int main()
 		struct cmdline *l;
 		int i, j;
 
-		printf("shell> ");
+		printf("kintama> ");
 		l = readcmd();
 
 		/* If input stream closed, normal termination */
