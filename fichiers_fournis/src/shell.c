@@ -24,9 +24,11 @@ void clear_redirection(struct cmdline *l , int doc_in, int doc_out){
 	}
 }
 
-void exec_quit(){
+void exec_quit(int pipefd[]){
 	printf("quit\n");
 	clear_pid();
+	Close(pipefd[1]);
+	Close(pipefd[0]);
 	exit(0);
 }
 
@@ -37,6 +39,8 @@ int main()
 		struct cmdline *l;
 		int i, j;
 		int doc_in,doc_out;
+		int pipefd[2];
+		pipe(pipefd);
 
 		printf("kintama> ");
 		l = readcmd();
@@ -72,19 +76,32 @@ int main()
 		for (i=0; l->seq[i]!=0; i++) {
 			char **cmd = l->seq[i];
 
-			if(Fork()==0){
-				execvp(cmd[0],cmd);
-				exit(0);
-			}
-
-			clear_pid();
-			clear_redirection(l,doc_in,doc_out);
-
 			printf("seq[%d]: ", i);
 
 			if(!strcmp(l->seq[i][0],"quit")){
-				exec_quit();
+				exec_quit(pipefd);
 			}
+
+			if(Fork()==0){
+				if (i==0){
+					Dup2(pipefd[0],0);
+					Close(pipefd[1]);
+				}
+				else if (l->seq[i+1] == 0){
+					Dup2(pipefd[1],1);
+					Close(pipefd[0]);
+				}
+				else{
+					Dup2(pipefd[1],1);
+					Dup2(pipefd[0],0);
+				}
+				execvp(cmd[0],cmd);
+				Close(pipefd[1]);
+				Close(pipefd[0]);
+				exit(0);
+			}
+
+			clear_redirection(l,doc_in,doc_out);
 			
 			for (j=0; cmd[j]!=0; j++) {
 				printf("%s ", cmd[j]);
@@ -92,5 +109,6 @@ int main()
 
 			printf("\n");
 		}
+		clear_pid();
 	}
 }
