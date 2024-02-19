@@ -7,7 +7,7 @@
 #include "readcmd.h"
 #include "csapp.h"
 
-#define FIFO_NAME "./fifo/fifo"
+#define FIFO_NAME "./fifo/fifo%d"
 
 void clear_pid(){
 	while(waitpid(-1,NULL,0)!=-1){}
@@ -35,12 +35,12 @@ void exec_quit(){
 
 int main()
 {
-	mkfifo(FIFO_NAME,0777);
 	while (1) {
 		struct cmdline *l;
 		int i, j;
 		int doc_in,doc_out;
 		int fifo_fd, fifo_fd1;
+		char fifo_actuel_name[50];
 		
 
 		printf("kintama> ");
@@ -85,24 +85,29 @@ int main()
 
 			if(Fork()==0){
 				if (i!=0 && l->seq[i+1] != 0){
-					fifo_fd=open(FIFO_NAME,O_RDWR);
-					printf("read : %d \n write : %d\n",fifo_fd,fifo_fd);
+					sprintf(fifo_actuel_name, FIFO_NAME, i);
+					mkfifo(fifo_actuel_name,0777);
+					fifo_fd1=open(fifo_actuel_name,O_WRONLY);
+
+					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
+					fifo_fd=open(fifo_actuel_name,O_RDONLY);
+
 					dup2(fifo_fd,0);
-					dup2(fifo_fd,1);
+					dup2(fifo_fd1,1);
 					
 				}
 				else if (i!=0) {
-					fifo_fd=open(FIFO_NAME,O_RDONLY);
+					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
+					fifo_fd=open(fifo_actuel_name,O_RDONLY);
 					dup2(fifo_fd,0);
-					printf("%d je suis bien ici ^^ %d ;)\n",fifo_fd,getpid());
 				}
 				else if (l->seq[i+1] != 0){
-					fifo_fd=open(FIFO_NAME,O_WRONLY); 
+					sprintf(fifo_actuel_name, FIFO_NAME, i);
+					mkfifo(fifo_actuel_name,0777);
+					fifo_fd=open(fifo_actuel_name,O_WRONLY); 
 					dup2(fifo_fd,1);
 				}
-				fprintf(stderr,"je passe ici ^^ %d\n",getpid());
 				execvp(cmd[0],cmd);
-				fprintf(stderr,"normalement pas ici ?\n");
 				exit(0);
 				
 			}
