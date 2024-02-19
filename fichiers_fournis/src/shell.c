@@ -7,6 +7,8 @@
 #include "readcmd.h"
 #include "csapp.h"
 
+#define FIFO_NAME "./fifo/fifo"
+
 void clear_pid(){
 	while(waitpid(-1,NULL,0)!=-1){}
 }
@@ -24,23 +26,22 @@ void clear_redirection(struct cmdline *l , int doc_in, int doc_out){
 	}
 }
 
-void exec_quit(int pipefd[]){
+void exec_quit(){
 	printf("quit\n");
 	clear_pid();
-	Close(pipefd[1]);
-	Close(pipefd[0]);
 	exit(0);
 }
 
 
 int main()
 {
+	mkfifo(FIFO_NAME,0777);
 	while (1) {
 		struct cmdline *l;
 		int i, j;
 		int doc_in,doc_out;
-		int pipefd[2];
-		pipe(pipefd);
+		int fifo_fd, fifo_fd1;
+		
 
 		printf("kintama> ");
 		l = readcmd();
@@ -79,29 +80,34 @@ int main()
 			printf("seq[%d]: ", i);
 
 			if(!strcmp(l->seq[i][0],"quit")){
-				exec_quit(pipefd);
+				exec_quit();
 			}
 
 			if(Fork()==0){
-				if (i==0){
-					Dup2(pipefd[0],0);
-					Close(pipefd[1]);
+				if (i!=0 && l->seq[i+1] != 0){
+					fifo_fd=open(FIFO_NAME,O_RDWR);
+					printf("read : %d \n write : %d\n",fifo_fd,fifo_fd);
+					dup2(fifo_fd,0);
+					dup2(fifo_fd,1);
+					
 				}
-				else if (l->seq[i+1] == 0){
-					Dup2(pipefd[1],1);
-					Close(pipefd[0]);
+				else if (i!=0) {
+					fifo_fd=open(FIFO_NAME,O_RDONLY);
+					dup2(fifo_fd,0);
+					printf("%d je suis bien ici ^^ %d ;)\n",fifo_fd,getpid());
 				}
-				else{
-					Dup2(pipefd[1],1);
-					Dup2(pipefd[0],0);
+				else if (l->seq[i+1] != 0){
+					fifo_fd=open(FIFO_NAME,O_WRONLY); 
+					dup2(fifo_fd,1);
 				}
+				fprintf(stderr,"je passe ici ^^ %d\n",getpid());
 				execvp(cmd[0],cmd);
-				Close(pipefd[1]);
-				Close(pipefd[0]);
+				fprintf(stderr,"normalement pas ici ?\n");
 				exit(0);
+				
 			}
 
-			clear_redirection(l,doc_in,doc_out);
+			//clear_redirection(l,doc_in,doc_out);
 			
 			for (j=0; cmd[j]!=0; j++) {
 				printf("%s ", cmd[j]);
