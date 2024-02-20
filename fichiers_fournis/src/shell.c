@@ -12,23 +12,23 @@
 void debbug(int val_retour, char* nom){
 	switch (val_retour) {
 		case 1:
-			printf("%s: command not found.\n", nom);
+			fprintf(stderr,"%s: command not found.\n", nom);
 			break;
 		case 2:
 			switch (errno) {
 				case EACCES:
-					printf("%s: Permission denied.\n", nom);
+					fprintf(stderr,"%s: Permission denied.\n", nom);
 					break;
 				case ENOENT:
-					printf("%s: File not found.\n", nom);
+					fprintf(stderr,"%s: File not found.\n", nom);
 					break;
 				default : 
-					printf("%s: Error number %d.\n", nom, errno);
+					fprintf(stderr,"%s: Error number %d.\n", nom, errno);
 					break;
 			}
 			break;
 		case 3:
-			printf("%s: Closing file error number %d.\n", nom, errno);
+			fprintf(stderr,"%s: Closing file error number %d.\n", nom, errno);
 	}	
 }
 
@@ -118,12 +118,14 @@ int main()
 
 			if(Fork()==0){
 				if (i!=0 && l->seq[i+1] != 0){
+					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
+					mkfifo(fifo_actuel_name,0777);
+					fifo_fd=open(fifo_actuel_name,O_RDONLY);
+
 					sprintf(fifo_actuel_name, FIFO_NAME, i);
 					mkfifo(fifo_actuel_name,0777);
 					fifo_fd1=open(fifo_actuel_name,O_WRONLY);
-
-					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
-					fifo_fd=open(fifo_actuel_name,O_RDONLY);
+					
 
 					dup2(fifo_fd,0);
 					dup2(fifo_fd1,1);
@@ -131,6 +133,7 @@ int main()
 				}
 				else if (i!=0) {
 					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
+					mkfifo(fifo_actuel_name,0777);
 					fifo_fd=open(fifo_actuel_name,O_RDONLY);
 					dup2(fifo_fd,0);
 				}
