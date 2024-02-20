@@ -37,14 +37,14 @@ void clear_pid(){
 }
 
 
-void clear_redirection(struct cmdline *l , int doc_in, int doc_out){
+void clear_redirection(struct cmdline *l , int doc_in, int doc_out,int new_stdin, int new_stdout){
 	if(l->in != NULL){
 		int e = close(doc_in);
 		if (e == -1) {
 			debbug(3, l->in);
 		}		
 		l->in = NULL;
-		dup2(5,0);
+		dup2(new_stdin,0);
 	}
 	if(l->out != NULL){
 		int e = close(doc_out);
@@ -52,7 +52,7 @@ void clear_redirection(struct cmdline *l , int doc_in, int doc_out){
 			debbug(3, l->in);
 		}
 		l->out = NULL;
-		dup2(6,1);
+		dup2(new_stdout,1);
 	}
 }
 
@@ -70,6 +70,7 @@ int main()
 		int i, j;
 		int doc_in,doc_out;
 		int fifo_fd, fifo_fd1;
+		int new_stdin,new_stdout;
 		char fifo_actuel_name[50];
 		
 
@@ -88,23 +89,6 @@ int main()
 			continue;
 		}
 
-		if (l->in != NULL) {
-			printf("in: %s\n", l->in);
-			doc_in = open(l->in,O_RDONLY,0);
-			if (doc_in == -1) {
-				debbug(2, l->in);
-			}
-			dup2(0,5);
-			dup2(doc_in,0);
-
-		}
-		if (l->out != NULL) {
-			printf("out: %s\n", l->out);
-			doc_out = open(l->out,O_WRONLY | O_CREAT | O_TRUNC,0752);
-			dup2(1,6);
-			dup2(doc_out,1);
-		}
-
 
 		/* Display each command of the pipe */
 		for (i=0; l->seq[i]!=0; i++) {
@@ -114,6 +98,23 @@ int main()
 
 			if(!strcmp(l->seq[i][0],"quit")){
 				exec_quit();
+			}
+			if (l->out != NULL && l->seq[i+1]==0) {
+				printf("out: %s\n", l->out);
+				doc_out = open(l->out,O_WRONLY | O_CREAT | O_TRUNC,0752);
+				new_stdout = dup(0);
+				dup2(doc_out,1);
+			}
+
+			if (l->in != NULL && l->seq[i+1]==0) {
+				printf("in: %s\n", l->in);
+				doc_in = open(l->in,O_RDONLY,0);
+				if (doc_in == -1) {
+					debbug(2, l->in);
+				}
+				new_stdin = dup(0);
+				dup2(doc_in,0);
+
 			}
 
 			if(Fork()==0){
@@ -151,7 +152,9 @@ int main()
 				
 			}
 
-			//clear_redirection(l,doc_in,doc_out);
+			if(l->seq[i+1]==0){
+				clear_redirection(l,doc_in,doc_out,new_stdin,new_stdout);
+			}
 			
 			for (j=0; cmd[j]!=0; j++) {
 				printf("%s ", cmd[j]);
