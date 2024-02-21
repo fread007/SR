@@ -6,72 +6,19 @@
 #include <stdlib.h>
 #include "readcmd.h"
 #include "csapp.h"
-
-#define FIFO_NAME "./fifo/fifo%d"
-
-void debbug(int val_retour, char* nom){
-	switch (val_retour) {
-		case 1:
-			fprintf(stderr,"%s: command not found.\n", nom);
-			break;
-		case 2:
-			switch (errno) {
-				case EACCES:
-					fprintf(stderr,"%s: Permission denied.\n", nom);
-					break;
-				case ENOENT:
-					fprintf(stderr,"%s: File not found.\n", nom);
-					break;
-				default : 
-					fprintf(stderr,"%s: Error number %d.\n", nom, errno);
-					break;
-			}
-			break;
-		case 3:
-			fprintf(stderr,"%s: Closing file error number %d.\n", nom, errno);
-	}	
-}
-
-void clear_pid(){
-	while(waitpid(-1,NULL,0)!=-1){}
-}
-
-
-void clear_redirection(struct cmdline *l , int doc_in, int doc_out,int new_stdin, int new_stdout){
-	if(l->in != NULL){
-		int e = close(doc_in);
-		if (e == -1) {
-			debbug(3, l->in);
-		}		
-		l->in = NULL;
-		dup2(new_stdin,0);
-	}
-	if(l->out != NULL){
-		int e = close(doc_out);
-		if (e == -1) {
-			debbug(3, l->in);
-		}
-		l->out = NULL;
-		dup2(new_stdout,1);
-	}
-}
-
-void exec_quit(){
-	printf("quit\n");
-	clear_pid();
-	exit(0);
-}
-
+#include "exec_cmd.h"
 
 int main()
 {
+	Signal(SIGCHLD,handler);
 	while (1) {
-		struct cmdline *l;
+		struct cmdline *l;	
 		int i, j;
-		int doc_in,doc_out;
-		int fifo_fd, fifo_fd1;
-		int new_stdin,new_stdout;
-		char fifo_actuel_name[50];
+		int doc_in,doc_out;		//descipteur des fichier d'entree et de sortie
+		int fifo_fd, fifo_fd1;	//descripteur pour les fifo 
+		int new_stdin,new_stdout;	//stoque stdin et stdout pour les remetre a leur place
+		int back_cmd=0;				//est egal a 1 si ont doit executer la commande en arriere plan
+		char fifo_actuel_name[50];	//chaine de caractere pour cree les fifo
 		
 
 		printf("kintama> ");
@@ -89,79 +36,69 @@ int main()
 			continue;
 		}
 
-
-		/* Display each command of the pipe */
-		for (i=0; l->seq[i]!=0; i++) {
-			char **cmd = l->seq[i];
-
-			printf("seq[%d]: ", i);
-
-			if(!strcmp(l->seq[i][0],"quit")){
-				exec_quit();
+		//test si la commande doit etre fait en arriere plan
+		if(l->background==1){
+			//cree un fils qui executera la commande
+			if (Fork()!=0){
+				//change la valeur de back_cmd pour que le pere n'execute pas la commande
+				back_cmd=1;
 			}
-			if (l->out != NULL && l->seq[i+1]==0) {
-				printf("out: %s\n", l->out);
-				doc_out = open(l->out,O_WRONLY | O_CREAT | O_TRUNC,0752);
-				new_stdout = dup(0);
-				dup2(doc_out,1);
-			}
-
-			if (l->in != NULL && l->seq[i+1]==0) {
-				printf("in: %s\n", l->in);
-				doc_in = open(l->in,O_RDONLY,0);
-				if (doc_in == -1) {
-					debbug(2, l->in);
-				}
-				new_stdin = dup(0);
-				dup2(doc_in,0);
-
-			}
-
-			if(Fork()==0){
-				if (i!=0 && l->seq[i+1] != 0){
-					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
-					mkfifo(fifo_actuel_name,0777);
-					fifo_fd=open(fifo_actuel_name,O_RDONLY);
-
-					sprintf(fifo_actuel_name, FIFO_NAME, i);
-					mkfifo(fifo_actuel_name,0777);
-					fifo_fd1=open(fifo_actuel_name,O_WRONLY);
-					
-
-					dup2(fifo_fd,0);
-					dup2(fifo_fd1,1);
-					
-				}
-				else if (i!=0) {
-					sprintf(fifo_actuel_name, FIFO_NAME, i-1);
-					mkfifo(fifo_actuel_name,0777);
-					fifo_fd=open(fifo_actuel_name,O_RDONLY);
-					dup2(fifo_fd,0);
-				}
-				else if (l->seq[i+1] != 0){
-					sprintf(fifo_actuel_name, FIFO_NAME, i);
-					mkfifo(fifo_actuel_name,0777);
-					fifo_fd=open(fifo_actuel_name,O_WRONLY); 
-					dup2(fifo_fd,1);
-				}
-				int e=execvp(cmd[0],cmd);
-				if (e == -1) {
-					debbug(1, cmd[0]);
-				}
-				exit(0);
-				
-			}
-
-			if(l->seq[i+1]==0){
-				clear_redirection(l,doc_in,doc_out,new_stdin,new_stdout);
-			}
-			
-			for (j=0; cmd[j]!=0; j++) {
-				printf("%s ", cmd[j]);
-			}
-
-			printf("\n");
 		}
-		clear_pid();
+
+		//teste si il doit effectuer la commande
+		if(back_cmd==0){
+			/* Display each command of the pipe */
+			for (i=0; l->seq[i]!=0; i++) {
+				char **cmd = l->seq[i];
+
+				printf("seq[%d] : ", i,getpid());
+
+				//teste est execution de la commande special quit
+				if(!strcmp(l->seq[i][0],"quit")){
+					exec_quit();
+				}
+				
+				//redirection de la sortie, ont verifie que l'on est bien a la derniere commande si dans un pipe
+				if (l->out != NULL && l->seq[i+1]==0) {
+					printf("out: %s\n", l->out);
+					//ouvre en ecriture , cree le fichier si besoin , si non le remet a 0
+					doc_out = open(l->out,O_WRONLY | O_CREAT | O_TRUNC,0752);
+					//deplace STDOUT
+					new_stdout = dup(0);
+					//change la sortie standare par le fichier
+					dup2(doc_out,1);
+				}
+
+				//redirection de l'entree, ont verifie que l'on est bien a la derniere commande si dans un pipe
+				if (l->in != NULL && l->seq[i+1]==0) {
+					printf("in: %s\n", l->in);
+					doc_in = open(l->in,O_RDONLY,0);
+					if (doc_in == -1) {
+						debbug(2, l->in);
+					}
+					new_stdin = dup(0);
+					dup2(doc_in,0);
+
+				}
+
+				execut_commande(l,fifo_actuel_name,fifo_fd,fifo_fd1,cmd,i);
+
+				if(l->seq[i+1]==0){
+					clear_redirection(l,doc_in,doc_out,new_stdin,new_stdout);
+				}
+				
+				for (j=0; cmd[j]!=0; j++) {
+					printf("%s ", cmd[j]);
+				}
+
+				printf("\n");
+			}
+			if (l->background==1){
+				exit(0);
+			}
+			clear_pid();
+			
+		}
+		l->background=0;
 	}
 }
