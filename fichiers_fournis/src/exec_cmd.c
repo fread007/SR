@@ -60,40 +60,40 @@ void debbug(int val_retour, char* nom){
 
 void handler(int sig){
 	pid_t pid;
-    //tant qu'il y a un fils zombie ont le termine
-	while((pid=waitpid(-1,NULL,WNOHANG))>0){}
+    // tant qu'il y a un fils zombi on le termine
+	while((pid = waitpid(-1,NULL,WNOHANG)) > 0){}
 }
 
 void clear_pid(){
-    //attend tout les processus fils
-	while(waitpid(0,NULL,0)!=-1){}
+    // attend tous les processus fils
+	while(waitpid(0, NULL, 0) != -1){}
 }
 
 
 void clear_redirection(struct cmdline *l , int doc_in, int doc_out,int new_stdin, int new_stdout){
-    //test si il y avais eu une redirection de l'entree
+    // teste s'il y a eu une redirection de l'entree
 	if(l->in != NULL){
-        //ferme le fichier
+        // ferme le fichier
 		int e = close(doc_in);
-        //test si il y a eu un probleme
+        // test s'il y a eu un probleme
 		if (e == -1) {
 			debbug(3, l->in);
 		}		
-        //remer a l'etat initial
+        // remet a l'etat initial
 		l->in = NULL;
-		dup2(new_stdin,0);
+		dup2(new_stdin, 0);
 	}
-    //test si il y avais eu une redirection de sortie
+    // teste s'il y a eu une redirection de sortie
 	if(l->out != NULL){
-        //ferme le fichier
+        // ferme le fichier
 		int e = close(doc_out);
-        //test si il y a eu un probleme
+        // teste s'il y a eu un probleme
 		if (e == -1) {
 			debbug(3, l->in);
 		}
-        //remer a l'etat initial
+        // remet a l'etat initial
 		l->out = NULL;
-		dup2(new_stdout,1);
+		dup2(new_stdout, 1);
 	}
 }
 
@@ -104,80 +104,80 @@ void exec_quit(){
 }
 
 void execut_commande (struct cmdline *l,char* fifo_actuel_name, int fifo_fd,int fifo_fd1, char **cmd,int i){
-    //cree un fils qui executera une commande du pipe
-    if(Fork()==0){
-        //si n'est ni le premier ni le dernier
+    // cree un fils qui executera une commande du pipe
+    if(Fork() == 0){
+        // si n'est ni le premier ni le dernier
         if (i!=0 && l->seq[i+1] != 0){
-            //ont cree un fifo(si il nexiste pas)
+            // on cree un fifo(s'il n'existe pas)
             sprintf(fifo_actuel_name, FIFO_NAME, i-1);
-            if(mkfifo(fifo_actuel_name,0777) == -1){
+            if (mkfifo(fifo_actuel_name, 0777) == -1){
                 if (errno != EEXIST){
                     debbug(4, "./fifo");
                 }
             }
-            //on ouvre le fifo en lecture
-            fifo_fd=open(fifo_actuel_name,O_RDONLY);
+            // on ouvre le fifo en lecture
+            fifo_fd = open(fifo_actuel_name, O_RDONLY);
             if (fifo_fd == -1) {
                 debbug(2, fifo_actuel_name);
             }
 
-            //ont cree un 2eme fifo(si il nexiste pas)
+            // on cree un 2eme fifo(s'il n'existe pas)
             sprintf(fifo_actuel_name, FIFO_NAME, i);
-            if(mkfifo(fifo_actuel_name,0777) == -1){
+            if (mkfifo(fifo_actuel_name, 0777) == -1){
                 if (errno != EEXIST){
                     debbug(4, "./fifo");
                 }
             }
-            //on ouvre le 2eme fifo en ecriture
-            fifo_fd1=open(fifo_actuel_name,O_WRONLY);
+            // on ouvre le 2eme fifo en ecriture
+            fifo_fd1 = open(fifo_actuel_name,O_WRONLY);
             if (fifo_fd1 == -1) {
                 debbug(2, fifo_actuel_name);
             }
 
-            //ont change l'entree standare par le 1er fifo
-            if (dup2(fifo_fd,0) == -1){
+            // on change l'entree standard par le 1er fifo
+            if (dup2(fifo_fd, 0) == -1){
                 debbug(4, "dup2");
             }
-            //ont change la sortie standare par le 2eme fifo
+            // on change la sortie standard par le 2eme fifo
             if (dup2(fifo_fd1,1) == -1){
                 debbug(4, "dup2");
             }
             
         }
         else if (i!=0) {        //si c'est le dernier
-            //ont cree un fifo(si il nexiste pas)
+            // on cree un fifo(s'il nexiste pas)
             sprintf(fifo_actuel_name, FIFO_NAME, i-1);
-            if(mkfifo(fifo_actuel_name,0777) == -1){
+            if (mkfifo(fifo_actuel_name, 0777) == -1){
                 if (errno != EEXIST){
                     debbug(4, "./fifo");
                 }
             }
-            //ont l'ouvre en lecture
-            fifo_fd=open(fifo_actuel_name,O_RDONLY);
-            //ont change l'entree standare
+            // on l'ouvre en lecture
+            fifo_fd = open(fifo_actuel_name, O_RDONLY);
+            // on change l'entree standard
             if (dup2(fifo_fd,0) == -1){
                 debbug(4, "dup2");
             }
         }
-        else if (l->seq[i+1] != 0){         //si c'est le premier
-            //ont cree un fifo(si il nexiste pas)
+        else if (l->seq[i+1] != 0){         // si c'est le premier
+            // on cree un fifo(s'il nexiste pas)
             sprintf(fifo_actuel_name, FIFO_NAME, i);
-            if(mkfifo(fifo_actuel_name,0777) == -1){
+            if (mkfifo(fifo_actuel_name, 0777) == -1){
                 if (errno != EEXIST){
                     debbug(4, "./fifo");
                 }
             }
-            //ont ouvre le fifo en ecriture
-            fifo_fd=open(fifo_actuel_name,O_WRONLY); 
-            //ont change la sortie standare
-            if (dup2(fifo_fd,1) == -1) {
+            // on ouvre le fifo en ecriture
+            fifo_fd = open(fifo_actuel_name, O_WRONLY); 
+            //on change la sortie standard
+            if (dup2(fifo_fd, 1) == -1) {
                 debbug(4, "dup2");
             };
         }
 
-        //ont execute la commande
-        int e=execvp(cmd[0],cmd);
-        //ont teste si il y a eu un probleùe
+        // on execute la commande
+        int e = execvp(cmd[0], cmd);
+        // on teste s'il y a eu un probleme
         if (e == -1) {
             debbug(1, cmd[0]);
         }

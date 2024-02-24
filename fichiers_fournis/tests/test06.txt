@@ -1,0 +1,4 @@
+#
+# test06.txt - Exécute une succession de pipe avec plusieurs fois la même commande avec des pipe
+#
+ls | grep s | grep s | grep s | grep s | grep s | grep s

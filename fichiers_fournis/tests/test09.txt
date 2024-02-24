@@ -1,0 +1,10 @@
+#
+# test09.txt - teste plusieurs commandes en arriere plan
+#
+echo
+sleep& 5
+echo& i'm in the backgroud
+echo& i'm in the backgroud too
+echo& i'm in the backgroud three
+ls
+quit

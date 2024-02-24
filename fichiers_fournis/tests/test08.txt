@@ -1,0 +1,12 @@
+#
+# test08.txt - teste une commande en arrière plan
+#
+sleep& 6
+echo
+echo hello
+sleep 1
+echo sleep is still in background
+sleep 2
+echo bye
+sleep 1
+quit

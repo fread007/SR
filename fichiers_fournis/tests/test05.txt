@@ -1,0 +1,7 @@
+#
+# test05.txt - Exécuter une succession de commandes avec arguments
+#
+ls -l
+cat ./tests/Hello_world
+wc -m ./tests/Hello_world 
+head -c 11 ./tests/Hello_world 
